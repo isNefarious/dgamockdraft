@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DGA Mock Draft Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script> <!-- Optional if using a database backend -->
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        h1 { text-align: center; color: #f59e0b; }
+        .section { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; }
+        select, input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 16px; margin-bottom: 15px; }
+        .pick-card { background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #f59e0b; }
+        button { background: #10b981; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; }
+        button:hover { background: #059669; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 DGA Mock Draft Portal</h1>
+        
+        <div class="section">
+            <label for="coachSelect">Select Your Discord User:</label>
+            <select id="coachSelect">
+                <option value="">-- Loading League Members --</option>
+            </select>
+        </div>
+
+        <div id="draftContainer">
+            <!-- Dynamically generated pick slots will appear here -->
+        </div>
+
+        <button onclick="submitMockDraft()">🚀 Lock In & Submit Mock Draft</button>
+    </div>
+
+    <script>
+        // Example mock data or fetched directly from your Sheets CSV exports
+        let leagueMembers = []; // Loaded from Sheet1 (ignoring [LEFT])
+        let draftProspects = []; // Loaded from Draft_Class
+        const totalPicks = 32; // Number of picks to mock draft
+
+        async function initPortal() {
+            // Fetch members and prospects from your Google Sheets CSV exports or API
+            // Example:
+            // leagueMembers = await fetchCSV('...Sheet1 CSV URL...');
+            // draftProspects = await fetchCSV('...Draft_Class CSV URL...');
+            
+            buildDraftUI();
+        }
+
+        function buildDraftUI() {
+            const container = document.getElementById('draftContainer');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= totalPicks; i++) {
+                const card = document.createElement('div');
+                card.className = 'pick-card';
+                card.innerHTML = `
+                    <h3>Pick #${i}</h3>
+                    <label>Filter by Position:</label>
+                    <select class="pos-filter" id="pos_${i}" onchange="filterProspects(${i})">
+                        <option value="ALL">All Positions</option>
+                        <option value="QB">QB</option>
+                        <option value="HB">HB</option>
+                        <option value="WR">WR</option>
+                        <option value="TE">TE</option>
+                        <option value="OL">OL</option>
+                        <option value="EDGE">EDGE</option>
+                        <option value="DL">DL</option>
+                        <option value="LB">LB</option>
+                        <option value="CB">CB</option>
+                        <option value="S">S</option>
+                    </select>
+                    <label>Select Prospect:</label>
+                    <select class="prospect-select" id="prospect_${i}" onchange="updateTakenPlayers()">
+                        <option value="">-- Select Prospect --</option>
+                    </select>
+                `;
+                container.appendChild(card);
+            }
+            populateProspectDropdowns();
+        }
+
+        function populateProspectDropdowns() {
+            // Populate initial list of prospects into all dropdowns
+            // (In full implementation, filter out players selected in other pick slots)
+        }
+
+        function filterProspects(pickNum) {
+            // Filters dropdown options based on selected position
+        }
+
+        function updateTakenPlayers() {
+            // Automatically removes selected players from all other pick dropdowns
+        }
+
+        function submitMockDraft() {
+            const coach = document.getElementById('coachSelect').value;
+            if(!coach) {
+                alert("Please select your Discord username!");
+                return;
+            }
+            alert("Mock draft locked in successfully!");
+            // Send data back to bot / spreadsheet via webhook or backend
+        }
+
+        window.onload = initPortal;
+    </script>
+</body>
+</html>
