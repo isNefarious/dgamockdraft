@@ -4,50 +4,111 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DGA Mock Draft Portal</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script> <!-- Optional if using a database backend -->
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        h1 { text-align: center; color: #f59e0b; }
-        .section { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; }
-        select, input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 16px; margin-bottom: 15px; }
-        .pick-card { background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #f59e0b; }
-        button { background: #10b981; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; }
-        button:hover { background: #059669; }
+        .container { max-width: 850px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { text-align: center; color: #f59e0b; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #94a3b8; margin-top: 0; margin-bottom: 30px; }
+        .section { margin-bottom: 25px; background: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #334155; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; color: #cbd5e1; }
+        select, input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: #fff; font-size: 15px; margin-bottom: 10px; box-sizing: border-box; }
+        .pick-card { background: #334155; padding: 18px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #f59e0b; }
+        .pick-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 18px; font-weight: bold; color: #facc15; }
+        .controls-row { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; }
+        button.submit-btn { background: #10b981; color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 20px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+        button.submit-btn:hover { background: #059669; }
+        .loading { text-align: center; color: #38bdf8; font-style: italic; padding: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎯 DGA Mock Draft Portal</h1>
+        <p class="subtitle">Digital Gridiron Association • Official Challenge</p>
         
         <div class="section">
-            <label for="coachSelect">Select Your Discord User:</label>
+            <label for="coachSelect">👤 Select Your Discord Username:</label>
             <select id="coachSelect">
-                <option value="">-- Loading League Members --</option>
+                <option value="">-- Loading Members from Sheet1 --</option>
             </select>
         </div>
 
         <div id="draftContainer">
-            <!-- Dynamically generated pick slots will appear here -->
+            <div class="loading">Loading prospects and draft order...</div>
         </div>
 
-        <button onclick="submitMockDraft()">🚀 Lock In & Submit Mock Draft</button>
+        <button class="submit-btn" onclick="submitMockDraft()">🚀 Lock In & Submit Mock Draft</button>
     </div>
 
     <script>
-        // Example mock data or fetched directly from your Sheets CSV exports
-        let leagueMembers = []; // Loaded from Sheet1 (ignoring [LEFT])
-        let draftProspects = []; // Loaded from Draft_Class
-        const totalPicks = 32; // Number of picks to mock draft
+        // REPLACE WITH YOUR PUBLISHED CSV URLS FROM GOOGLE SHEETS
+        const SHEET1_CSV_URL = "YOUR_SHEET1_CSV_URL_HERE";
+        const DRAFT_CLASS_CSV_URL = "YOUR_DRAFT_CLASS_CSV_URL_HERE";
+
+        let members = [];
+        let prospects = [];
+        const totalPicks = 32;
 
         async function initPortal() {
-            // Fetch members and prospects from your Google Sheets CSV exports or API
-            // Example:
-            // leagueMembers = await fetchCSV('...Sheet1 CSV URL...');
-            // draftProspects = await fetchCSV('...Draft_Class CSV URL...');
+            try {
+                const [membersText, draftText] = await Promise.all([
+                    fetch(SHEET1_CSV_URL).then(res => res.text()),
+                    fetch(DRAFT_CLASS_CSV_URL).then(res => res.text())
+                ]);
+
+                members = parseCSV(membersText);
+                
+                // SANITIZE PROSPECTS: Keep ONLY Name, Position, and College/School. Strip everything else!
+                let rawProspects = parseCSV(draftText);
+                prospects = rawProspects.map(p => {
+                    let fName = p['FIRST'] || p['First Name'] || '';
+                    let lName = p['LAST'] || p['Last Name'] || '';
+                    return {
+                        name: `${fName} ${lName}`.trim(),
+                        pos: (p['POS'] || p['pos'] || '').toUpperCase(),
+                        college: p['COLLEGE'] || p['College'] || 'N/A'
+                    };
+                }).filter(p => p.name !== '');
+
+                populateMembers();
+                buildDraftUI();
+            } catch (err) {
+                console.error("Initialization error:", err);
+                document.getElementById('draftContainer').innerHTML = `<p style="color: #ef4444; text-align:center;">⚠️ Error loading spreadsheet data.</p>`;
+            }
+        }
+
+        function parseCSV(text) {
+            let lines = text.split('\n');
+            let result = [];
+            let headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
             
-            buildDraftUI();
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                let currentLine = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                let obj = {};
+                for (let j = 0; j < headers.length; j++) {
+                    let val = currentLine[j] ? currentLine[j].trim().replace(/^"|"$/g, '') : '';
+                    obj[headers[j]] = val;
+                }
+                result.push(obj);
+            }
+            return result;
+        }
+
+        function populateMembers() {
+            const select = document.getElementById('coachSelect');
+            select.innerHTML = '<option value="">-- Choose Your Username --</option>';
+            
+            members.forEach(m => {
+                let username = m['User'] || '';
+                let discordId = m['Discord ID'] || '';
+                if (username && !username.toUpperCase().includes('[LEFT]')) {
+                    let opt = document.createElement('option');
+                    opt.value = discordId || username;
+                    opt.textContent = username;
+                    select.appendChild(opt);
+                }
+            });
         }
 
         function buildDraftUI() {
@@ -55,55 +116,92 @@
             container.innerHTML = '';
 
             for (let i = 1; i <= totalPicks; i++) {
-                const card = document.createElement('div');
+                let card = document.createElement('div');
                 card.className = 'pick-card';
                 card.innerHTML = `
-                    <h3>Pick #${i}</h3>
-                    <label>Filter by Position:</label>
-                    <select class="pos-filter" id="pos_${i}" onchange="filterProspects(${i})">
-                        <option value="ALL">All Positions</option>
-                        <option value="QB">QB</option>
-                        <option value="HB">HB</option>
-                        <option value="WR">WR</option>
-                        <option value="TE">TE</option>
-                        <option value="OL">OL</option>
-                        <option value="EDGE">EDGE</option>
-                        <option value="DL">DL</option>
-                        <option value="LB">LB</option>
-                        <option value="CB">CB</option>
-                        <option value="S">S</option>
-                    </select>
-                    <label>Select Prospect:</label>
-                    <select class="prospect-select" id="prospect_${i}" onchange="updateTakenPlayers()">
-                        <option value="">-- Select Prospect --</option>
-                    </select>
+                    <div class="pick-header">
+                        <span>Pick #${i}</span>
+                    </div>
+                    <div class="controls-row">
+                        <div>
+                            <label>Filter Position:</label>
+                            <select id="pos_${i}" onchange="updateProspectDropdown(${i})">
+                                <option value="ALL">All Positions</option>
+                                <option value="QB">QB</option>
+                                <option value="HB">HB</option>
+                                <option value="WR">WR</option>
+                                <option value="TE">TE</option>
+                                <option value="OL">OL</option>
+                                <option value="EDGE">EDGE</option>
+                                <option value="DL">DL</option>
+                                <option value="LB">LB</option>
+                                <option value="CB">CB</option>
+                                <option value="S">S</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Select Prospect:</label>
+                            <select id="prospect_${i}" onchange="refreshAllDropdowns()">
+                                <option value="">-- Select Player --</option>
+                            </select>
+                        </div>
+                    </div>
                 `;
                 container.appendChild(card);
             }
-            populateProspectDropdowns();
+            refreshAllDropdowns();
         }
 
-        function populateProspectDropdowns() {
-            // Populate initial list of prospects into all dropdowns
-            // (In full implementation, filter out players selected in other pick slots)
+        function getSelectedProspects() {
+            let selected = new Set();
+            for (let i = 1; i <= totalPicks; i++) {
+                let val = document.getElementById(`prospect_${i}`).value;
+                if (val) selected.add(val);
+            }
+            return selected;
         }
 
-        function filterProspects(pickNum) {
-            // Filters dropdown options based on selected position
+        function updateProspectDropdown(pickNum) {
+            let posFilter = document.getElementById(`pos_${pickNum}`).value;
+            let prospectSelect = document.getElementById(`prospect_${pickNum}`);
+            let currentVal = prospectSelect.value;
+            let takenProspects = getSelectedProspects();
+
+            prospectSelect.innerHTML = '<option value="">-- Select Player --</option>';
+
+            prospects.forEach(p => {
+                if (posFilter !== 'ALL' && !p.pos.includes(posFilter)) return;
+                if (takenProspects.has(p.name) && p.name !== currentVal) return;
+
+                let opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = `${p.name} (${p.pos} - ${p.college})`;
+                if (p.name === currentVal) opt.selected = true;
+                prospectSelect.appendChild(opt);
+            });
         }
 
-        function updateTakenPlayers() {
-            // Automatically removes selected players from all other pick dropdowns
+        function refreshAllDropdowns() {
+            for (let i = 1; i <= totalPicks; i++) {
+                updateProspectDropdown(i);
+            }
         }
 
         function submitMockDraft() {
-            const coach = document.getElementById('coachSelect').value;
-            if(!coach) {
+            let coach = document.getElementById('coachSelect').value;
+            if (!coach) {
                 alert("Please select your Discord username!");
                 return;
             }
-            alert("Mock draft locked in successfully!");
-            // Send data back to bot / spreadsheet via webhook or backend
+
+            let predictions = {};
+            for (let i = 1; i <= totalPicks; i++) {
+                predictions[`Pick ${i}`] = document.getElementById(`prospect_${i}`).value;
+            }
+
+            // Here you can send 'predictions' to a webhook or your bot backend
+            console.log("Submitted:", coach, predictions);
+            alert("🚀 Mock draft locked in successfully!");
         }
 
         window.onload = initPortal;
